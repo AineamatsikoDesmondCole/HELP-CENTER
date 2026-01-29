@@ -4,6 +4,13 @@ require_once '../includes/config.php';
 require_once '../includes/db.php';
 require_once '../includes/functions.php';
 
+  require_once '../vendor/autoload.php';
+  use PHPMailer\PHPMailer\PHPMailer;
+  use PHPMailer\PHPMailer\Exception;
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
 requireAdmin();
 
 $db   = new Database();
@@ -54,23 +61,125 @@ if ($action === 'answer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $conn->commit();
 
-                // Send email to user (simple mail())
-                $to      = $question['user_email'];
-                $subject = 'Answer to your support question - ' . SITE_NAME;
-                $body    = "Hello,\n\n"
-                    . "You asked:\n"
-                    . $question['question'] . "\n\n"
-                    . "Our answer:\n"
-                    . $answerText . "\n\n"
-                    . "Thank you,\n"
-                    . SITE_NAME . ' Support';
+        
+                // SEND EMAIL USING PHPMailer
+            
+                $emailSent = false;
+                $emailError = '';
+                
+                try {
+                    
+                    
+                    $mail = new PHPMailer(true);
+                    
+                
+                    
+                    // SMTP Configuration
+                    $mail->isSMTP();
+                    $mail->Host       = SMTP_HOST;
+                    $mail->SMTPAuth   = true;
+                    $mail->Username   = SMTP_USER;
+                    $mail->Password   = SMTP_PASS;
+                    $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+                    $mail->Port       = SMTP_PORT;
+                    
+                    // Sender
+                    $mail->setFrom(SMTP_USER, SITE_NAME . ' Support');
+                    $mail->addReplyTo(SMTP_USER, SITE_NAME . ' Support');
+                    
+                    // Recipient
+                    $mail->addAddress($question['user_email']);
+                    
+                    // Email content
+                    $mail->isHTML(true);
+                    $mail->Subject = 'Answer to your support question - ' . SITE_NAME;
+                    
+                    // HTML email body
+                    $htmlBody = '<!DOCTYPE html>
+                    <html>
+                    <head>
+                        <meta charset="UTF-8">
+                        <style>
+                            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                            .header { background: #4a6bdf; color: white; padding: 20px; text-align: center; }
+                            .content { padding: 30px; background: #f9f9f9; }
+                            .question { background: #e9f7fe; padding: 15px; border-left: 4px solid #4a6bdf; margin: 20px 0; }
+                            .answer { background: #f0f8f0; padding: 15px; border-left: 4px solid #28a745; margin: 20px 0; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="container">
+                            <div class="header">
+                                <h1>' . htmlspecialchars(SITE_NAME) . '</h1>
+                                <p>Support Team Response</p>
+                            </div>
+                            <div class="content">
+                                <h2>Your Question Has Been Answered</h2>
+                                <p>Hello,</p>
+                                <p>Thank you for contacting our support team. Here is the response to your question:</p>
+                                
+                                <div class="question">
+                                    <strong>Your Question:</strong><br>
+                                    ' . nl2br(htmlspecialchars($question['question'])) . '
+                                </div>
+                                
+                                <div class="answer">
+                                    <strong>Our Answer:</strong><br>
+                                    ' . nl2br(htmlspecialchars($answerText)) . '
+                                </div>
+                                
+                                <p>If you have any further questions, please reply to this email.</p>
+                                <p>Best regards,<br>' . htmlspecialchars(SITE_NAME) . ' Support Team</p>
+                            </div>
+                        </div>
+                    </body>
+                    </html>';
+                    
+                    $mail->Body = $htmlBody;
+                    
+                    // Plain text alternative
+                    $plainText = "Hello,\n\n" .
+                                "Thank you for contacting our support team. Here is the response to your question:\n\n" .
+                                "Your Question:\n" .
+                                $question['question'] . "\n\n" .
+                                "Our Answer:\n" .
+                                $answerText . "\n\n" .
+                                "If you have any further questions, please reply to this email.\n\n" .
+                                "Best regards,\n" .
+                                SITE_NAME . " Support Team";
+                    
+                    $mail->AltBody = $plainText;
+                    
+                    // Send email
+                    if ($mail->send()) {
+                        $emailSent = true;
+                        error_log("✅ Email sent successfully to: " . $question['user_email']);
+                    } else {
+                        $emailError = 'Mailer Error: ' . $mail->ErrorInfo;
+                        error_log("❌ Email failed: " . $emailError);
+                    }
+                    
+                } catch (Exception $e) {
+                    $emailError = 'Email Exception: ' . $e->getMessage();
+                    error_log('PHPMailer error: ' . $emailError);
+                }
+                
+                // Set flash message based on email status
+                if ($emailSent) {
+                    $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Answer sent and emailed successfully!'];
+                } else {
+                    $_SESSION['flash_message'] = ['type' => 'warning', 'message' => 'Answer saved but email failed to send. Error: ' . $emailError];
+                }
+                
+                header('Location: support.php');
+                exit;
 
-                @mail($to, $subject, $body);
-
-                redirect('support.php', 'Answer sent and question updated successfully');
             } catch (Exception $e) {
                 $conn->rollBack();
-                redirect('support.php', 'Error saving answer. Please try again.');
+                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Error saving answer: ' . $e->getMessage()];
+                header('Location: support.php');
+                exit;
             }
         }
     }
@@ -123,8 +232,12 @@ $answered     = $conn->query('SELECT * FROM support_questions WHERE answered = 1
         </a>
     </div>
 
-    <?php if ($message = getFlashMessage()): ?>
-        <div class="alert alert-success"><?php echo htmlspecialchars($message); ?></div>
+    <?php if (isset($_SESSION['flash_message'])): ?>
+        <div class="alert alert-<?php echo $_SESSION['flash_message']['type']; ?> alert-dismissible fade show">
+            <?php echo $_SESSION['flash_message']['message']; ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+        <?php unset($_SESSION['flash_message']); ?>
     <?php endif; ?>
 
     <?php if ($action === 'answer' && !empty($question)): ?>
@@ -270,5 +383,3 @@ $answered     = $conn->query('SELECT * FROM support_questions WHERE answered = 1
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
-
-
