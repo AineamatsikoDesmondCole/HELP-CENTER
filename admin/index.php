@@ -1,8 +1,14 @@
 <?php
 session_start();
+<<<<<<< HEAD
 require_once '../config/config.php';
 require_once '../config/db.php';
 require_once '../helpers/functions.php';
+=======
+require_once '../includes/config.php';
+require_once '../includes/db.php';
+require_once '../includes/functions.php';
+>>>>>>> 36257f9ac8a2c27b93a4b73606d4a36660c330d7
 
 // Enforce admin authentication
 requireAdmin();
