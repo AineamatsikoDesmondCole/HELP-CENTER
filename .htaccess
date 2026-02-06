@@ -1,0 +1,19 @@
+# Prevent directory listing
+Options -Indexes
+
+# Protect config files
+<FilesMatch "\.(php|ini|log)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Allow specific files
+<FilesMatch "^(index|api)\.php$">
+    Order allow,deny
+    Allow from all
+</FilesMatch>
+
+# URL Rewriting (pretty URLs)
+RewriteEngine On
+RewriteRule ^faq/([0-9]+)$ faq.php?id=$1 [L,QSA]
+RewriteRule ^category/([0-9]+)$ category.php?id=$1 [L,QSA]
