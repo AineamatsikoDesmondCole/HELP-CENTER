@@ -2,6 +2,12 @@
 require_once 'config/config.php';
 require_once 'config/db.php';
 require_once 'helpers/functions.php';
+require_once 'models/CategoryModel.php';
+require_once 'models/FAQModel.php';
+
+// Initialize models
+$categoryModel = new CategoryModel();
+$faqModel = new FAQModel();
 ?>
 
 <?php include 'includes/header.php'; ?>
@@ -60,8 +66,7 @@ require_once 'helpers/functions.php';
             </div>
             <div class="list-group list-group-flush">
                 <?php
-                $db = new Database();
-                $stmt = $db->query("SELECT * FROM categories WHERE is_archived = FALSE ORDER BY name");
+                $stmt = $categoryModel->getAllCategories();
                 while ($category = $stmt->fetch()):
                 ?>
                 <a href="category.php?id=<?php echo $category['id']; ?>" 
@@ -97,14 +102,7 @@ require_once 'helpers/functions.php';
         </div>
         
         <?php
-        $stmt = $db->query("
-            SELECT f.*, c.name as category_name 
-            FROM faqs f 
-            LEFT JOIN categories c ON f.category_id = c.id 
-            WHERE f.is_archived = FALSE 
-            ORDER BY (f.upvotes - f.downvotes) DESC 
-            LIMIT 15
-        ");
+        $stmt = $faqModel->getMostHelpfulFAQs(15);
         
         if ($stmt->rowCount() > 0):
             while ($faq = $stmt->fetch()): 

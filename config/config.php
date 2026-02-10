@@ -6,7 +6,7 @@ define('DB_USER', 'root');
 define('DB_PASS', '');
 
 // Site configuration
-define('SITE_NAME', 'ERP Help Center');
+define('SITE_NAME', 'Help Center');
 define('SITE_URL', 'http://localhost/erp-help-center/');
 
 // Security

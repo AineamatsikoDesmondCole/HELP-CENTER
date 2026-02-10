@@ -11,7 +11,8 @@ abstract class BaseController {
     protected $db;
     
     public function __construct() {
-        $this->db = new Database();
+        global $db;
+        $this->db = $db;
     }
     
     /**

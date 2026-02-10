@@ -31,4 +31,8 @@ class Database {
         return $stmt;
     }
 }
+
+// Global database instance - create after class definition
+global $db;
+$db = new Database();
 ?>
