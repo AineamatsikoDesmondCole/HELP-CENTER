@@ -1,6 +1,13 @@
 <?php
 require_once 'config/config.php';
+require_once 'config/db.php';
 require_once 'helpers/functions.php';
+require_once 'models/CategoryModel.php';
+require_once 'models/FAQModel.php';
+
+// Initialize models
+$categoryModel = new CategoryModel();
+$faqModel = new FAQModel();
 
 // Get category ID from URL
 $categoryId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -11,11 +18,7 @@ if ($categoryId <= 0) {
 }
 
 // Get category details
-$db = new Database();
-$category = $db->query(
-    "SELECT * FROM categories WHERE id = ? AND is_archived = FALSE",
-    [$categoryId]
-)->fetch();
+$category = $categoryModel->getCategory($categoryId);
 
 if (!$category) {
     header('Location: index.php');
@@ -23,18 +26,10 @@ if (!$category) {
 }
 
 // Get FAQs for this category
-$faqs = $db->query("
-    SELECT * FROM faqs 
-    WHERE category_id = ? AND is_archived = FALSE 
-    ORDER BY id DESC
-", [$categoryId]);
+$faqs = $faqModel->getFAQsByCategory($categoryId);
 
 // Get all categories for sidebar
-$allCategories = $db->query("
-    SELECT * FROM categories 
-    WHERE is_archived = FALSE 
-    ORDER BY name
-");
+$allCategories = $categoryModel->getAllCategories();
 ?>
 
 <?php 

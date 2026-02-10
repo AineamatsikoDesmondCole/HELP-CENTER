@@ -2,31 +2,37 @@
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../helpers/functions.php';
+require_once __DIR__ . '/../models/FAQModel.php';
+require_once __DIR__ . '/../models/CategoryModel.php';
+require_once __DIR__ . '/../models/SupportModel.php';
 
 class AdminController {
-    private $db;
+    private $faqModel;
+    private $categoryModel;
+    private $supportModel;
     
     public function __construct() {
-        $this->db = new Database();
+        $this->faqModel = new FAQModel();
+        $this->categoryModel = new CategoryModel();
+        $this->supportModel = new SupportModel();
     }
     
     /**
      * Get dashboard statistics
      */
     public function getDashboardStats() {
-        $conn = $this->db->getConnection();
-        
         // Get FAQ count
-        $faqCount = $conn->query("SELECT COUNT(*) as count FROM faqs WHERE is_archived = 0")->fetch()['count'];
+        $faqCount = $this->faqModel->getTotalFAQCount();
         
         // Get pending support questions
-        $pendingCount = $conn->query("SELECT COUNT(*) as count FROM support_questions WHERE answered = 0")->fetch()['count'];
+        $pendingCount = $this->supportModel->getPendingSupportCount();
         
         // Get new questions for notification badge
-        $newQuestions = $conn->query("SELECT COUNT(*) as count FROM support_questions WHERE admin_viewed = 0")->fetch()['count'];
+        $newQuestions = $this->supportModel->getPendingSupportCount();
         
         // Get categories count
-        $categoryCount = $conn->query("SELECT COUNT(*) as count FROM categories WHERE is_archived = 0")->fetch()['count'];
+        $categories = $this->categoryModel->getAllCategories();
+        $categoryCount = count($categories->fetchAll());
         
         return [
             'faq_count' => $faqCount,
@@ -40,7 +46,10 @@ class AdminController {
      * Create new FAQ
      */
     public function createFAQ($question, $answer, $categoryId) {
-        return $this->db->query("
+        // This method would need to be implemented in FAQModel
+        // For now, keeping the direct database access
+        global $db;
+        return $db->query("
             INSERT INTO faqs (question, answer, category_id) 
             VALUES (?, ?, ?)
         ", [$question, $answer, $categoryId]);
@@ -50,7 +59,10 @@ class AdminController {
      * Update FAQ
      */
     public function updateFAQ($id, $question, $answer, $categoryId) {
-        return $this->db->query("
+        // This method would need to be implemented in FAQModel
+        // For now, keeping the direct database access
+        global $db;
+        return $db->query("
             UPDATE faqs 
             SET question = ?, answer = ?, category_id = ? 
             WHERE id = ?
@@ -61,7 +73,10 @@ class AdminController {
      * Archive FAQ
      */
     public function archiveFAQ($id, $archivedBy) {
-        return $this->db->query("
+        // This method would need to be implemented in FAQModel
+        // For now, keeping the direct database access
+        global $db;
+        return $db->query("
             UPDATE faqs 
             SET is_archived = TRUE, archived_by = ? 
             WHERE id = ?
@@ -72,7 +87,10 @@ class AdminController {
      * Restore FAQ
      */
     public function restoreFAQ($id) {
-        return $this->db->query("
+        // This method would need to be implemented in FAQModel
+        // For now, keeping the direct database access
+        global $db;
+        return $db->query("
             UPDATE faqs 
             SET is_archived = FALSE, archived_by = NULL 
             WHERE id = ?
@@ -83,6 +101,9 @@ class AdminController {
      * Get all FAQs (including archived for admin)
      */
     public function getAllFAQs($includeArchived = false) {
+        // This method would need to be implemented in FAQModel
+        // For now, keeping the direct database access
+        global $db;
         $sql = "SELECT f.*, c.name as category_name 
                 FROM faqs f 
                 LEFT JOIN categories c ON f.category_id = c.id";
@@ -93,13 +114,16 @@ class AdminController {
         
         $sql .= " ORDER BY f.id DESC";
         
-        return $this->db->query($sql);
+        return $db->query($sql);
     }
     
     /**
      * Get all categories (including archived for admin)
      */
     public function getAllCategories($includeArchived = false) {
+        // This method would need to be implemented in CategoryModel
+        // For now, keeping the direct database access
+        global $db;
         $sql = "SELECT * FROM categories";
         
         if (!$includeArchived) {
@@ -108,7 +132,7 @@ class AdminController {
         
         $sql .= " ORDER BY name";
         
-        return $this->db->query($sql);
+        return $db->query($sql);
     }
 }
 ?>
