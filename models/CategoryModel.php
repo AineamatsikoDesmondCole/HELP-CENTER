@@ -87,5 +87,17 @@ class CategoryModel {
             WHERE id = ?
         ", [$id]);
     }
+    
+    /**
+     * Get total categories count
+     */
+    public function getTotalCategoryCount() {
+        $result = $this->db->query("
+            SELECT COUNT(*) as count 
+            FROM categories 
+            WHERE is_archived = FALSE
+        ");
+        return $result->fetch()['count'];
+    }
 }
 ?>

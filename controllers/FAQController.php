@@ -8,6 +8,7 @@ class FAQController {
     private $faqModel;
     
     public function __construct() {
+        global $db;
         $this->faqModel = new FAQModel();
     }
     

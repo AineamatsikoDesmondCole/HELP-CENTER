@@ -22,31 +22,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Please enter both username and password';
     } else {
         try {
-            $db = new Database();
-            $conn = $db->getConnection();
+            $auth = new Auth();
             
-            // Get user from database
-            $stmt = $conn->prepare("SELECT id, username, password_hash, role FROM users WHERE username = ?");
-            $stmt->execute([$username]);
-            $user = $stmt->fetch();
-            
-            if ($user && password_verify($password, $user['password_hash'])) {
-                if ($user['role'] === 'admin') {
-                    // Set session variables
-                    $_SESSION['user_id'] = $user['id'];
-                    $_SESSION['username'] = $user['username'];
-                    $_SESSION['role'] = $user['role'];
-                    $_SESSION['last_login'] = time();
-                    
-                    // Regenerate session ID for security
-                    session_regenerate_id(true);
-                    
-                    // Redirect to dashboard
-                    header('Location: index.php');
-                    exit;
-                } else {
-                    $error = 'Access denied. Admin privileges required.';
-                }
+            if ($auth->login($username, $password)) {
+                // Login successful
+                session_regenerate_id(true);
+                header('Location: index.php');
+                exit;
             } else {
                 $error = 'Invalid username or password';
             }

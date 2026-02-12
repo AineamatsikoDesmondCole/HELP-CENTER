@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once 'config/config.php';
 require_once 'config/db.php';
 require_once 'helpers/functions.php';
@@ -221,14 +222,14 @@ async function voteFAQ(faqId, type, buttonEl) {
     group.querySelectorAll('button').forEach(btn => btn.disabled = true);
 
     try {
-        const response = await fetch('api/vote.php', {
+        const response = await fetch('<?php echo SITE_URL; ?>api/vote.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ faq_id: faqId, type })
         });
 
         const data = await response.json();
-        if (!response.ok || data.error) {
+        if (!data.success || data.error) {
             throw new Error(data.error || 'Vote failed');
         }
 

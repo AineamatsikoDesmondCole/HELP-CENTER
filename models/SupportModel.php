@@ -22,9 +22,9 @@ class SupportModel {
      */
     public function createSupportQuestion($name, $email, $question) {
         return $this->db->query("
-            INSERT INTO support_questions (name, email, question, created_at) 
-            VALUES (?, ?, ?, NOW())
-        ", [$name, $email, $question]);
+            INSERT INTO support_questions (user_email, question) 
+            VALUES (?, ?)
+        ", [$email, $question]);
     }
     
     /**
@@ -49,13 +49,82 @@ class SupportModel {
     }
     
     /**
-     * Delete support question
+     * Get single support question
      */
-    public function deleteSupportQuestion($questionId) {
-        return $this->db->query("
-            DELETE FROM support_questions 
+    public function getSupportQuestion($questionId) {
+        $result = $this->db->query("
+            SELECT * FROM support_questions 
             WHERE id = ?
         ", [$questionId]);
+        return $result->fetch();
+    }
+    
+    /**
+     * Answer support question
+     */
+    public function answerSupportQuestion($questionId, $adminId, $answerText, $faqId = null) {
+        return $this->db->query("
+            UPDATE support_questions 
+            SET answered = 1, admin_viewed = 1, answered_by = ?, faq_id = COALESCE(?, faq_id)
+            WHERE id = ?
+        ", [$adminId, $faqId, $questionId]);
+    }
+    
+    /**
+     * Mark all questions as viewed
+     */
+    public function markAllQuestionsViewed() {
+        return $this->db->query("
+            UPDATE support_questions 
+            SET admin_viewed = 1 
+            WHERE admin_viewed = 0
+        ");
+    }
+    
+    /**
+     * Get new/unseen questions count
+     */
+    public function getNewSupportCount() {
+        $result = $this->db->query("
+            SELECT COUNT(*) as count 
+            FROM support_questions 
+            WHERE admin_viewed = 0 AND answered = 0
+        ");
+        return $result->fetch()['count'];
+    }
+    
+    /**
+     * Get new support questions
+     */
+    public function getNewSupportQuestions() {
+        return $this->db->query("
+            SELECT * FROM support_questions 
+            WHERE admin_viewed = 0 AND answered = 0 
+            ORDER BY id DESC
+        ");
+    }
+    
+    /**
+     * Get pending support questions
+     */
+    public function getPendingSupportQuestions() {
+        return $this->db->query("
+            SELECT * FROM support_questions 
+            WHERE admin_viewed = 1 AND answered = 0 
+            ORDER BY id DESC
+        ");
+    }
+    
+    /**
+     * Get answered support questions
+     */
+    public function getAnsweredSupportQuestions() {
+        return $this->db->query("
+            SELECT * FROM support_questions 
+            WHERE answered = 1 
+            ORDER BY id DESC 
+            LIMIT 50
+        ");
     }
 }
 ?>

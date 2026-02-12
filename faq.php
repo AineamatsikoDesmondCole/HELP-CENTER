@@ -1,6 +1,8 @@
 <?php
 require_once 'config/config.php';
 require_once 'helpers/functions.php';
+require_once 'models/FAQModel.php';
+require_once 'models/CategoryModel.php';
 
 // Get FAQ ID from URL
 $faqId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
@@ -10,14 +12,12 @@ if ($faqId <= 0) {
     exit;
 }
 
+// Initialize models
+$faqModel = new FAQModel();
+$categoryModel = new CategoryModel();
+
 // Get FAQ details
-$db = new Database();
-$faq = $db->query("
-    SELECT f.*, c.name as category_name 
-    FROM faqs f 
-    LEFT JOIN categories c ON f.category_id = c.id 
-    WHERE f.id = ? AND f.is_archived = FALSE
-", [$faqId])->fetch();
+$faq = $faqModel->getFAQ($faqId);
 
 if (!$faq) {
     // FAQ doesn't exist or is archived
@@ -103,15 +103,7 @@ if (!$faq) {
             </div>
             <div class="list-group list-group-flush">
                 <?php
-                $relatedFaqs = $db->query("
-                    SELECT id, question 
-                    FROM faqs 
-                    WHERE category_id = ? 
-                      AND id != ? 
-                      AND is_archived = FALSE 
-                    ORDER BY (upvotes - downvotes) DESC 
-                    LIMIT 5
-                ", [$faq['category_id'], $faqId]);
+                $relatedFaqs = $faqModel->getRelatedFAQs($faqId, $faq['category_id'], 5);
                 
                 while ($related = $relatedFaqs->fetch()):
                 ?>
@@ -138,14 +130,14 @@ async function voteFAQ(faqId, type, buttonEl) {
     group.querySelectorAll('button').forEach(btn => btn.disabled = true);
 
     try {
-        const response = await fetch('api/vote.php', {
+        const response = await fetch('<?php echo SITE_URL; ?>api/vote.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ faq_id: faqId, type })
         });
 
         const data = await response.json();
-        if (!response.ok || data.error) {
+        if (!data.success || data.error) {
             throw new Error(data.error || 'Vote failed');
         }
 

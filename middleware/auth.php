@@ -5,13 +5,13 @@ class Auth {
     private $db;
     
     public function __construct() {
-        $database = new Database();
-        $this->db = $database->getConnection();
+        global $db;
+        $this->db = $db;
     }
     
     // Admin login
     public function login($username, $password) {
-        $stmt = $this->db->prepare("SELECT * FROM users WHERE username = ? AND role = 'admin'");
+        $stmt = $this->db->getConnection()->prepare("SELECT * FROM users WHERE username = ? AND role = 'admin'");
         $stmt->execute([$username]);
         $user = $stmt->fetch();
         

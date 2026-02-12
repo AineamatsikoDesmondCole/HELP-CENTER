@@ -3,29 +3,48 @@ session_start();
 require_once '../config/config.php';
 require_once '../config/db.php';
 require_once '../helpers/functions.php';
+require_once '../models/SupportModel.php';
+require_once '../models/CategoryModel.php';
+require_once __DIR__ . '/../models/FAQModel.php';
 
-  require_once '../vendor/autoload.php';
-  use PHPMailer\PHPMailer\PHPMailer;
-  use PHPMailer\PHPMailer\Exception;
+// Import PHPMailer directly
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\SMTP;
+use PHPMailer\PHPMailer\Exception;
+
+// Fallback: Include PHPMailer manually if autoloader fails
+if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+    require_once __DIR__ . '/../vendor/phpmailer/phpmailer/src/PHPMailer.php';
+    require_once __DIR__ . '/../vendor/phpmailer/phpmailer/src/SMTP.php';
+    require_once __DIR__ . '/../vendor/phpmailer/phpmailer/src/Exception.php';
+}
+
 // Enable error reporting for debugging
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
 requireAdmin();
 
-$db   = new Database();
-$conn = $db->getConnection();
+// Debug: Check if PHPMailer is available
+if (!class_exists('PHPMailer\PHPMailer\PHPMailer')) {
+    error_log('PHPMailer class not found!');
+    die('PHPMailer is not installed. Please run: composer install');
+}
 
 $action = $_GET['action'] ?? 'list';
 $id     = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
+// Initialize models
+$supportModel = new SupportModel();
+$categoryModel = new CategoryModel();
+
 // Mark all questions as viewed when loading list
 if ($action === 'list') {
-    $conn->query('UPDATE support_questions SET admin_viewed = 1 WHERE admin_viewed = 0');
+    $supportModel->markAllQuestionsViewed();
 }
 
 // Load categories for optional FAQ creation
-$categories = $conn->query('SELECT id, name FROM categories WHERE is_archived = 0 ORDER BY name')->fetchAll();
+$categories = $categoryModel->getAllCategories();
 
 // Handle answer submission
 if ($action === 'answer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -36,39 +55,41 @@ if ($action === 'answer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($questionId > 0 && $answerText !== '') {
         // Get question record
-        $stmt = $conn->prepare('SELECT * FROM support_questions WHERE id = ?');
-        $stmt->execute([$questionId]);
-        $question = $stmt->fetch();
-
+        $question = $supportModel->getSupportQuestion($questionId);
+        
         if ($question) {
-            $conn->beginTransaction();
             try {
                 $faqId = null;
                 if ($addToFaq && $faqCategory > 0) {
-                    // Insert into FAQs and store link
-                    $faqStmt = $conn->prepare('INSERT INTO faqs (question, answer, category_id) VALUES (?, ?, ?)');
-                    $faqStmt->execute([$question['question'], $answerText, $faqCategory]);
-                    $faqId = (int)$conn->lastInsertId();
+                    try {
+                        // Insert into FAQs and store link
+                        error_log("Attempting to create FAQ with category: $faqCategory");
+                        $faqModel = new FAQModel();
+                        $faqModel->createFAQ($question['question'], $answerText, $faqCategory);
+                        error_log("FAQ created successfully");
+                        
+                        // Get the inserted FAQ ID
+                        $newFaq = $faqModel->getMostHelpfulFAQs(1);
+                        if ($newFaq && $newFaq->rowCount() > 0) {
+                            $newFaqData = $newFaq->fetch();
+                            $faqId = $newFaqData['id'];
+                            error_log("FAQ ID retrieved: $faqId");
+                        }
+                    } catch (Exception $e) {
+                        error_log("Error creating FAQ: " . $e->getMessage());
+                        // Continue without adding to FAQ if there's an error
+                    }
                 }
 
-                // Update support question as answered
-                $updateStmt = $conn->prepare('
-                    UPDATE support_questions 
-                    SET answered = 1, admin_viewed = 1, answered_by = ?, faq_id = COALESCE(?, faq_id)
-                    WHERE id = ?
-                ');
-                $updateStmt->execute([$_SESSION['user_id'], $faqId, $questionId]);
-
-                $conn->commit();
-
-        
-                // SEND EMAIL USING PHPMailer
-            
-                $emailSent = false;
-                $emailError = '';
+                $result = $supportModel->answerSupportQuestion($questionId, $_SESSION['user_id'], $answerText, $faqId);
                 
-                try {
+                if ($result) {
+                    $emailSent = false;
+                    $emailError = '';
+                
+                    try {
                     
+                    // SEND EMAIL USING PHPMailer
                     
                     $mail = new PHPMailer(true);
                     
@@ -164,7 +185,7 @@ if ($action === 'answer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $emailError = 'Email Exception: ' . $e->getMessage();
                     error_log('PHPMailer error: ' . $emailError);
                 }
-                
+            }
                 // Set flash message based on email status
                 if ($emailSent) {
                     $_SESSION['flash_message'] = ['type' => 'success', 'message' => 'Answer sent and emailed successfully!'];
@@ -172,13 +193,12 @@ if ($action === 'answer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
                     $_SESSION['flash_message'] = ['type' => 'warning', 'message' => 'Answer saved but email failed to send. Error: ' . $emailError];
                 }
                 
-                header('Location: support.php');
+                header('Location: support.php?action=list');
                 exit;
-
             } catch (Exception $e) {
-                $conn->rollBack();
-                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Error saving answer: ' . $e->getMessage()];
-                header('Location: support.php');
+                error_log('Error processing answer: ' . $e->getMessage());
+                $_SESSION['flash_message'] = ['type' => 'danger', 'message' => 'Error processing answer: ' . $e->getMessage()];
+                header('Location: support.php?action=list');
                 exit;
             }
         }
@@ -187,15 +207,14 @@ if ($action === 'answer' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Load question to answer form
 if ($action === 'answer' && $id > 0 && $_SERVER['REQUEST_METHOD'] === 'GET') {
-    $stmt = $conn->prepare('SELECT * FROM support_questions WHERE id = ?');
-    $stmt->execute([$id]);
-    $question = $stmt->fetch();
+    $question = $supportModel->getSupportQuestion($id);
 }
 
 // Lists
-$newQuestions = $conn->query('SELECT * FROM support_questions WHERE admin_viewed = 0 AND answered = 0 ORDER BY id DESC')->fetchAll();
-$pending      = $conn->query('SELECT * FROM support_questions WHERE admin_viewed = 1 AND answered = 0 ORDER BY id DESC')->fetchAll();
-$answered     = $conn->query('SELECT * FROM support_questions WHERE answered = 1 ORDER BY id DESC LIMIT 50')->fetchAll();
+$newQuestions = $supportModel->getNewSupportQuestions()->fetchAll();
+$pending      = $supportModel->getPendingSupportQuestions()->fetchAll();
+$answered     = $supportModel->getAnsweredSupportQuestions()->fetchAll();
+
 ?>
 
 <!DOCTYPE html>

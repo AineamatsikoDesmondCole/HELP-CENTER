@@ -3,26 +3,30 @@ session_start();
 require_once '../config/config.php';
 require_once '../config/db.php';
 require_once '../helpers/functions.php';
+require_once '../models/FAQModel.php';
+require_once '../models/SupportModel.php';
+require_once '../models/CategoryModel.php';
 
 // Enforce admin authentication
 requireAdmin();
 
 // Get stats for dashboard
 try {
-    $db = new Database();
-    $conn = $db->getConnection();
+    $faqModel = new FAQModel();
+    $supportModel = new SupportModel();
+    $categoryModel = new CategoryModel();
     
     // Get FAQ count
-    $faqCount = $conn->query("SELECT COUNT(*) as count FROM faqs WHERE is_archived = 0")->fetch()['count'];
+    $faqCount = $faqModel->getTotalFAQCount();
     
     // Get pending support questions (not yet answered)
-    $pendingCount = $conn->query("SELECT COUNT(*) as count FROM support_questions WHERE answered = 0")->fetch()['count'];
-
+    $pendingCount = $supportModel->getPendingSupportCount();
+    
     // Get new/unseen questions for notification badge
-    $newQuestions = $conn->query("SELECT COUNT(*) as count FROM support_questions WHERE admin_viewed = 0")->fetch()['count'];
+    $newQuestions = $supportModel->getNewSupportCount();
     
     // Get categories count
-    $categoryCount = $conn->query("SELECT COUNT(*) as count FROM categories WHERE is_archived = 0")->fetch()['count'];
+    $categoryCount = $categoryModel->getTotalCategoryCount();
     
 } catch (Exception $e) {
     // Default values if error

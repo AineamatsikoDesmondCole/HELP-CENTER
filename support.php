@@ -1,6 +1,7 @@
 <?php
 require_once 'config/config.php';
 require_once 'helpers/functions.php';
+require_once 'models/SupportModel.php';
 
 // Load PHPMailer for admin notifications
 require_once 'vendor/autoload.php';
@@ -25,13 +26,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         // Save to database
         try {
-            $db = new Database();
-            $stmt = $db->query(
-                "INSERT INTO support_questions (user_email, question) VALUES (?, ?)",
-                [$email, $question]
-            );
+            $supportModel = new SupportModel();
+            $stmt = $supportModel->createSupportQuestion('', $email, $question);
             
-            $lastInsertId = $db->getConnection()->lastInsertId();
+            $lastInsertId = $stmt->rowCount() > 0 ? true : false;
             
             $success = 'Your question has been submitted! Our support team will contact you via email.';
             

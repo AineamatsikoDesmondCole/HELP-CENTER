@@ -1,8 +1,8 @@
 <?php
 // Ensure session is started for helpers that rely on $_SESSION
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+// if (session_status() === PHP_SESSION_NONE) {
+//     session_start();
+// }
 
 
 /**

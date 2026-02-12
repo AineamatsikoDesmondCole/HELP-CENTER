@@ -105,5 +105,15 @@ class FAQModel {
         $result = $this->db->query("SELECT COUNT(*) as count FROM faqs WHERE is_archived = FALSE");
         return $result->fetch()['count'];
     }
+    
+    /**
+     * Create new FAQ
+     */
+    public function createFAQ($question, $answer, $categoryId) {
+        return $this->db->query("
+            INSERT INTO faqs (question, answer, category_id) 
+            VALUES (?, ?, ?)
+        ", [$question, $answer, $categoryId]);
+    }
 }
 ?>

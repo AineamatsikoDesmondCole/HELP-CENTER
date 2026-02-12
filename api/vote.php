@@ -5,6 +5,9 @@ require_once __DIR__ . '/../controllers/BaseController.php';
 
 class VoteController extends BaseController {
     public function handleRequest() {
+        // Debug: Check for any output before JSON
+        error_log("Vote API called - Method: " . $_SERVER['REQUEST_METHOD'] . ", Input: " . file_get_contents('php://input'));
+        
         // Basic validation
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
             $this->errorResponse('Method not allowed', 405);
@@ -23,12 +26,15 @@ class VoteController extends BaseController {
             $faqController = new FAQController();
             $result = $faqController->voteFAQ($faqId, $type);
             
+            error_log("Vote result: " . print_r($result, true));
+            
             $this->jsonResponse([
                 'success'   => true,
                 'upvotes'   => (int)$result['upvotes'],
                 'downvotes' => (int)$result['downvotes'],
             ]);
         } catch (Exception $e) {
+            error_log("Vote exception: " . $e->getMessage());
             $this->errorResponse('Failed to record vote', 500);
         }
     }
